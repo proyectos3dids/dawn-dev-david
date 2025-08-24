@@ -259,110 +259,46 @@ NO
     newButtonAction(button) {
       if (!button) return;
       
-      // Disable button to prevent multiple clicks
-      button.disabled = true;
-      button.setAttribute('disabled', 'disabled');
-      button.setAttribute('aria-disabled', 'true');
-      button.classList.add('disabled');
-      button.style.opacity = '0.6';
-      button.style.cursor = 'not-allowed';
-      
       // Check the hidden input for re attribute
       const reInput = document.getElementById('cart-re-attribute');
       const hasReAttribute = reInput && reInput.hasAttribute('data-re') && reInput.getAttribute('data-re') === 'true';
       
-      // Get original button text and create spinner
-      const buttonText = button.querySelector('span') || button;
-      const originalText = buttonText.textContent;
-      
-      // Create spinner element
-      const spinner = document.createElement('span');
-      spinner.innerHTML = '⏳ ';
-      spinner.className = 'checkout-spinner';
-      
-      buttonText.textContent = 'Procesando...';
-      buttonText.insertBefore(spinner, buttonText.firstChild);
-      
       // Log for debugging
       console.log('Checkout button hijacked:', button);
       
-      // Remove any existing message
-      const existingMessage = button.parentNode.querySelector('.checkout-hijacker-message');
-      if (existingMessage) {
-        existingMessage.remove();
-      }
-
-      // Create message element
-      const messageElement = document.createElement('div');
-      messageElement.className = 'checkout-hijacker-message';
-      messageElement.style.cssText = 'margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; font-size: 14px; text-align: center;';
-      
-      // Function to restore button state
-      const restoreButton = () => {
-        button.disabled = false;
-        button.removeAttribute('disabled');
-        button.setAttribute('aria-disabled', 'false');
-        button.classList.remove('disabled');
-        button.style.opacity = '1';
-        button.style.cursor = 'pointer';
-        buttonText.textContent = originalText;
-        if (spinner.parentNode) {
-          spinner.remove();
-        }
-      };
-      
       // Function to proceed to checkout
       const proceedToCheckout = () => {
-        messageElement.textContent = 'Redirigiendo al checkout...';
-        messageElement.style.backgroundColor = '#d4edda';
-        messageElement.style.color = '#155724';
-        
-        setTimeout(() => {
-          window.location.href = '/checkout';
-        }, 1000);
+        window.location.href = '/checkout';
       };
       
-      // Function to show error and allow retry
-      const showError = (errorMessage) => {
-        restoreButton();
-        messageElement.textContent = errorMessage + ' Haz clic en "Finalizar pedido" para intentar de nuevo.';
-        messageElement.style.backgroundColor = '#f8d7da';
-        messageElement.style.color = '#721c24';
-      };
-      
-      // Check if customer has 're' tag and show appropriate message
+      // Check if customer has 're' tag
       if (hasReAttribute) {
         // Check if product is already in cart using the hidden input
         const productCheckInput = document.getElementById('cart-product-check');
         const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
         
         if (productInCart) {
-          messageElement.textContent = 'Producto ya está en el carrito. Procediendo al checkout...';
-          messageElement.style.backgroundColor = '#d4edda';
-          messageElement.style.color = '#155724';
-          
           // Proceed to checkout since product is already in cart
           proceedToCheckout();
         } else {
-          messageElement.textContent = 'Añadiendo producto al carrito...';
-          messageElement.style.backgroundColor = '#d1ecf1';
-          messageElement.style.color = '#0c5460';
-          
           // Get product from theme settings
           const variantId = this.getRecargoEquivalenciaVariant();
           if (variantId) {
-            this.addProductToCart(variantId, messageElement, proceedToCheckout, showError);
+            // Create a dummy message element for the addProductToCart function
+            const dummyMessageElement = document.createElement('div');
+            this.addProductToCart(variantId, dummyMessageElement, proceedToCheckout, () => {
+              // On error, just proceed to checkout anyway
+              proceedToCheckout();
+            });
           } else {
-            showError('Error: Producto de recargo no configurado en las configuraciones del tema.');
+            // If product not configured, proceed to checkout anyway
+            proceedToCheckout();
           }
         }
       } else {
         // For users without 're' tag, proceed directly to checkout
         proceedToCheckout();
       }
-
-      // Insert message after the button
-      button.parentNode.insertBefore(messageElement, button.nextSibling);
     }
   }
 
