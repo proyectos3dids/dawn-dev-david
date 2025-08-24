@@ -174,7 +174,7 @@ NO
     }
 
     // Function to add product to cart
-     addProductToCart(variantId, messageElement) {
+     addProductToCart(variantId, messageElement, onSuccess, onError) {
        const formData = {
          'items': [{
            'id': variantId,
@@ -189,12 +189,23 @@ NO
          },
          body: JSON.stringify(formData)
        })
-       .then(response => response.json())
+       .then(response => {
+         if (!response.ok) {
+           throw new Error(`HTTP error! status: ${response.status}`);
+         }
+         return response.json();
+       })
        .then(data => {
          console.log('Product added successfully:', data);
+         
+         // Check if the response indicates an error
+         if (data.status && data.status === 422) {
+           throw new Error(data.description || 'Error al añadir producto al carrito');
+         }
+         
          messageElement.textContent = 'Producto añadido exitosamente!';
-         messageElement.style.backgroundColor = '#d1ecf1';
-         messageElement.style.color = '#0c5460';
+         messageElement.style.backgroundColor = '#d4edda';
+         messageElement.style.color = '#155724';
          
          // Dispatch cart update event to refresh cart UI
          publish(PUB_SUB_EVENTS.cartUpdate, {
@@ -213,12 +224,34 @@ NO
          if (cartDrawerItems && typeof cartDrawerItems.onCartUpdate === 'function') {
            cartDrawerItems.onCartUpdate();
          }
+         
+         // Update the hidden input to reflect the new cart state
+         const productCheckInput = document.getElementById('cart-product-check');
+         if (productCheckInput) {
+           productCheckInput.setAttribute('data-product-in-cart', 'true');
+         }
+         
+         // Call success callback
+         if (onSuccess) {
+           onSuccess();
+         }
        })
        .catch((error) => {
-         console.error('Error:', error);
-         messageElement.textContent = 'Error al añadir producto';
-         messageElement.style.backgroundColor = '#f8d7da';
-         messageElement.style.color = '#721c24';
+         console.error('Error adding product to cart:', error);
+         
+         let errorMessage = 'Error al añadir producto al carrito.';
+         if (error.message && error.message !== 'Failed to fetch') {
+           errorMessage = error.message;
+         }
+         
+         // Call error callback
+         if (onError) {
+           onError(errorMessage);
+         } else {
+           messageElement.textContent = errorMessage;
+           messageElement.style.backgroundColor = '#f8d7da';
+           messageElement.style.color = '#721c24';
+         }
        });
      }
 
@@ -226,22 +259,29 @@ NO
     newButtonAction(button) {
       if (!button) return;
       
+      // Disable button to prevent multiple clicks
+      button.disabled = true;
+      button.setAttribute('disabled', 'disabled');
+      button.setAttribute('aria-disabled', 'true');
+      button.classList.add('disabled');
+      button.style.opacity = '0.6';
+      button.style.cursor = 'not-allowed';
+      
       // Check the hidden input for re attribute
       const reInput = document.getElementById('cart-re-attribute');
       const hasReAttribute = reInput && reInput.hasAttribute('data-re') && reInput.getAttribute('data-re') === 'true';
       
-      // Disable the button
-      button.disabled = true;
-      button.setAttribute('disabled', 'disabled');
-      button.setAttribute('aria-disabled', 'true');
-      
-      // Add visual feedback
-      button.classList.add('disabled');
-      
-      // Optional: Change button text to indicate it's been hijacked
+      // Get original button text and create spinner
       const buttonText = button.querySelector('span') || button;
       const originalText = buttonText.textContent;
+      
+      // Create spinner element
+      const spinner = document.createElement('span');
+      spinner.innerHTML = '⏳ ';
+      spinner.className = 'checkout-spinner';
+      
       buttonText.textContent = 'Procesando...';
+      buttonText.insertBefore(spinner, buttonText.firstChild);
       
       // Log for debugging
       console.log('Checkout button hijacked:', button);
@@ -257,6 +297,39 @@ NO
       messageElement.className = 'checkout-hijacker-message';
       messageElement.style.cssText = 'margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; font-size: 14px; text-align: center;';
       
+      // Function to restore button state
+      const restoreButton = () => {
+        button.disabled = false;
+        button.removeAttribute('disabled');
+        button.setAttribute('aria-disabled', 'false');
+        button.classList.remove('disabled');
+        button.style.opacity = '1';
+        button.style.cursor = 'pointer';
+        buttonText.textContent = originalText;
+        if (spinner.parentNode) {
+          spinner.remove();
+        }
+      };
+      
+      // Function to proceed to checkout
+      const proceedToCheckout = () => {
+        messageElement.textContent = 'Redirigiendo al checkout...';
+        messageElement.style.backgroundColor = '#d4edda';
+        messageElement.style.color = '#155724';
+        
+        setTimeout(() => {
+          window.location.href = '/checkout';
+        }, 1000);
+      };
+      
+      // Function to show error and allow retry
+      const showError = (errorMessage) => {
+        restoreButton();
+        messageElement.textContent = errorMessage + ' Haz clic en "Finalizar pedido" para intentar de nuevo.';
+        messageElement.style.backgroundColor = '#f8d7da';
+        messageElement.style.color = '#721c24';
+      };
+      
       // Check if customer has 're' tag and show appropriate message
       if (hasReAttribute) {
         // Check if product is already in cart using the hidden input
@@ -264,33 +337,28 @@ NO
         const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
         
         if (productInCart) {
-          messageElement.textContent = 'Es true - Producto ya está en el carrito. Procediendo al checkout...';
+          messageElement.textContent = 'Producto ya está en el carrito. Procediendo al checkout...';
           messageElement.style.backgroundColor = '#d4edda';
           messageElement.style.color = '#155724';
           
           // Proceed to checkout since product is already in cart
-          setTimeout(() => {
-            window.location.href = '/checkout';
-          }, 1000);
+          proceedToCheckout();
         } else {
-          messageElement.textContent = 'Es true - Añadiendo producto...';
-          messageElement.style.backgroundColor = '#d4edda';
-          messageElement.style.color = '#155724';
+          messageElement.textContent = 'Añadiendo producto al carrito...';
+          messageElement.style.backgroundColor = '#d1ecf1';
+          messageElement.style.color = '#0c5460';
           
           // Get product from theme settings
           const variantId = this.getRecargoEquivalenciaVariant();
           if (variantId) {
-            this.addProductToCart(variantId.toString(), messageElement);
+            this.addProductToCart(variantId, messageElement, proceedToCheckout, showError);
           } else {
-            messageElement.textContent = 'Error: Producto de recargo no configurado en las configuraciones del tema';
-            messageElement.style.backgroundColor = '#f8d7da';
-            messageElement.style.color = '#721c24';
+            showError('Error: Producto de recargo no configurado en las configuraciones del tema.');
           }
         }
       } else {
-        messageElement.textContent = 'Botón de checkout secuestrado! Aquí puedes agregar tu lógica personalizada.';
-        messageElement.style.backgroundColor = '#fff3cd';
-        messageElement.style.color = '#856404';
+        // For users without 're' tag, proceed directly to checkout
+        proceedToCheckout();
       }
 
       // Insert message after the button
