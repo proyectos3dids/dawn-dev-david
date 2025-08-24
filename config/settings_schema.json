@@ -1451,5 +1451,16 @@
         "default": "scheme-1"
       }
     ]
+  },
+  {
+    "name": "Recargo de Equivalencia",
+    "settings": [
+      {
+        "type": "product",
+        "id": "recargo_equivalencia_product",
+        "label": "Producto de Recargo de Equivalencia",
+        "info": "Selecciona el producto que se añadirá automáticamente al carrito para usuarios con etiqueta 're'."
+      }
+    ]
   }
 ]

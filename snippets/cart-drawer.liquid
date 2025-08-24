@@ -86,14 +86,16 @@
           method="post"
         >
           <div id="CartDrawer-CartItems" class="drawer__contents js-contents">
-            {%- comment -%} Check if product with variant ID 56305163436419 is in cart {%- endcomment -%}
+            {%- comment -%} Check if recargo equivalencia product from theme settings is in cart {%- endcomment -%}
             {%- assign product_in_cart = false -%}
-            {%- for item in cart.items -%}
-              {%- if item.variant.id == 56305163436419 -%}
-                {%- assign product_in_cart = true -%}
-                {%- break -%}
-              {%- endif -%}
-            {%- endfor -%}
+            {%- if settings.recargo_equivalencia_product != blank -%}
+              {%- for item in cart.items -%}
+                {%- if item.product.id == settings.recargo_equivalencia_product.id -%}
+                  {%- assign product_in_cart = true -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
             
             {%- if product_in_cart -%}
               <input type="hidden" id="cart-product-check" data-product-in-cart="true" />

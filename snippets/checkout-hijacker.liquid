@@ -159,6 +159,20 @@ NO
       }
     }
 
+    // Function to get variant ID from theme settings
+    getRecargoEquivalenciaVariant() {
+      // Get the product from theme settings
+      const productHandle = '{{ settings.recargo_equivalencia_product.handle }}';
+      const variantId = '{{ settings.recargo_equivalencia_product.selected_or_first_available_variant.id }}';
+      
+      if (productHandle && variantId && variantId !== '') {
+        return parseInt(variantId);
+      }
+      
+      console.error('Recargo de equivalencia product not configured in theme settings');
+      return null;
+    }
+
     // Function to add product to cart
      addProductToCart(variantId, messageElement) {
        const formData = {
@@ -263,8 +277,15 @@ NO
           messageElement.style.backgroundColor = '#d4edda';
           messageElement.style.color = '#155724';
           
-          // Add product with variant ID 56305163436419 using Ajax API
-          this.addProductToCart('56305163436419', messageElement);
+          // Get product from theme settings
+          const variantId = this.getRecargoEquivalenciaVariant();
+          if (variantId) {
+            this.addProductToCart(variantId.toString(), messageElement);
+          } else {
+            messageElement.textContent = 'Error: Producto de recargo no configurado en las configuraciones del tema';
+            messageElement.style.backgroundColor = '#f8d7da';
+            messageElement.style.color = '#721c24';
+          }
         }
       } else {
         messageElement.textContent = 'Botón de checkout secuestrado! Aquí puedes agregar tu lógica personalizada.';
