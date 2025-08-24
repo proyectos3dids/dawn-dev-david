@@ -250,9 +250,14 @@ NO
         const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
         
         if (productInCart) {
-          messageElement.textContent = 'Es true - Producto ya está en el carrito';
-          messageElement.style.backgroundColor = '#fff3cd';
-          messageElement.style.color = '#856404';
+          messageElement.textContent = 'Es true - Producto ya está en el carrito. Procediendo al checkout...';
+          messageElement.style.backgroundColor = '#d4edda';
+          messageElement.style.color = '#155724';
+          
+          // Proceed to checkout since product is already in cart
+          setTimeout(() => {
+            window.location.href = '/checkout';
+          }, 1000);
         } else {
           messageElement.textContent = 'Es true - Añadiendo producto...';
           messageElement.style.backgroundColor = '#d4edda';
