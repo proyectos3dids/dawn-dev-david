@@ -246,6 +246,18 @@ NO
     newButtonAction(button) {
       if (!button) return;
       
+      // Disable button permanently and show processing text
+      button.disabled = true;
+      button.setAttribute('disabled', 'true');
+      button.setAttribute('aria-disabled', 'true');
+      button.classList.add('disabled');
+      button.style.opacity = '0.6';
+      button.style.cursor = 'not-allowed';
+      
+      // Change button text to "Procesando..."
+      const buttonText = button.querySelector('span') || button;
+      buttonText.textContent = 'Procesando...';
+      
       // Check the hidden input for re attribute
       const reInput = document.getElementById('cart-re-attribute');
       const hasReAttribute = reInput && reInput.hasAttribute('data-re') && reInput.getAttribute('data-re') === 'true';
