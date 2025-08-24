@@ -203,10 +203,6 @@ NO
            throw new Error(data.description || 'Error al añadir producto al carrito');
          }
          
-         messageElement.textContent = 'Producto añadido exitosamente!';
-         messageElement.style.backgroundColor = '#d4edda';
-         messageElement.style.color = '#155724';
-         
          // Dispatch cart update event to refresh cart UI
          publish(PUB_SUB_EVENTS.cartUpdate, {
            source: 'checkout-hijacker',
@@ -239,18 +235,9 @@ NO
        .catch((error) => {
          console.error('Error adding product to cart:', error);
          
-         let errorMessage = 'Error al añadir producto al carrito.';
-         if (error.message && error.message !== 'Failed to fetch') {
-           errorMessage = error.message;
-         }
-         
          // Call error callback
          if (onError) {
-           onError(errorMessage);
-         } else {
-           messageElement.textContent = errorMessage;
-           messageElement.style.backgroundColor = '#f8d7da';
-           messageElement.style.color = '#721c24';
+           onError();
          }
        });
      }
