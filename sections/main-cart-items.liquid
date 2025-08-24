@@ -51,6 +51,20 @@
     <form action="{{ routes.cart_url }}" class="cart__contents critical-hidden" method="post" id="cart">
       <div class="cart__items" id="main-cart-items" data-id="{{ section.id }}">
         <div class="js-contents">
+          {%- comment -%} Check if product with variant ID 56305163436419 is in cart {%- endcomment -%}
+          {%- assign product_in_cart = false -%}
+          {%- for item in cart.items -%}
+            {%- if item.variant.id == 56305163436419 -%}
+              {%- assign product_in_cart = true -%}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+          
+          {%- if product_in_cart -%}
+            <input type="hidden" id="cart-product-check" data-product-in-cart="true" />
+          {%- else -%}
+            <input type="hidden" id="cart-product-check" data-product-in-cart="false" />
+          {%- endif -%}
           {%- if cart != empty -%}
             <table class="cart-items">
               <caption class="visually-hidden">

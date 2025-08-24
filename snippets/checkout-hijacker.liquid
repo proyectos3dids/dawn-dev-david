@@ -1,0 +1,285 @@
+{% comment %}
+  Renders checkout button hijacker.
+  This snippet intercepts ONLY checkout button clicks (not Add to Cart buttons) and prevents default behavior,
+  then disables the button using the newButtonAction function.
+  
+  Targets:
+  - Cart drawer checkout button
+  - Main cart footer checkout button  
+  - Cart notification checkout button
+  
+  Usage:
+  {% render 'checkout-hijacker' %}
+{% endcomment %}
+
+{% comment %} Check if customer is logged in and has "re" tag {% endcomment %}
+{% assign recargo = false %}
+NO
+{{ customer.name }}
+{% if customer %}
+  SI
+  {% for tag in customer.tags %}
+    {% assign tag_lowercase = tag | downcase %}
+    {{ tag_lowercase }}
+    {% if tag_lowercase == 're' %}
+      {% assign recargo = true %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{{ recargo }}
+
+{% comment %} Hidden field for cart attribute {% endcomment %}
+<input type="hidden" id="cart-re-attribute" {% if recargo %}data-re="true"{% endif %} style="display: none;">
+
+<script>
+  // Import PUB_SUB_EVENTS and pubsub functions
+  const PUB_SUB_EVENTS = {
+    cartUpdate: 'cart-update',
+    quantityUpdate: 'quantity-update',
+    optionValueSelectionChange: 'option-value-selection-change',
+    variantChange: 'variant-change',
+    cartError: 'cart-error',
+  };
+
+  let subscribers = {};
+
+  function subscribe(eventName, callback) {
+    if (subscribers[eventName] === undefined) {
+      subscribers[eventName] = [];
+    }
+
+    subscribers[eventName] = [...subscribers[eventName], callback];
+
+    return function unsubscribe() {
+      subscribers[eventName] = subscribers[eventName].filter((cb) => {
+        return cb !== callback;
+      });
+    };
+  }
+
+  function publish(eventName, data) {
+    if (subscribers[eventName]) {
+      const promises = subscribers[eventName]
+        .map((callback) => callback(data))
+      return Promise.all(promises);
+    } else {
+      return Promise.resolve()
+    }
+  }
+
+  class CheckoutHijacker {
+    constructor() {
+      this.init();
+    }
+
+    init() {
+      // Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.hijackButtons());
+      } else {
+        this.hijackButtons();
+      }
+    }
+
+    hijackButtons() {
+      // Hijack checkout buttons in cart drawer
+      this.hijackCartDrawerCheckout();
+      
+      // Hijack checkout buttons in main cart footer
+      this.hijackMainCartCheckout();
+      
+      // Hijack cart notification checkout
+      this.hijackCartNotificationCheckout();
+    }
+
+
+
+    hijackCartDrawerCheckout() {
+      const cartDrawerCheckout = document.querySelector('#CartDrawer-Checkout');
+      
+      if (cartDrawerCheckout) {
+        // Clone to remove existing listeners
+        const newButton = cartDrawerCheckout.cloneNode(true);
+        cartDrawerCheckout.parentNode.replaceChild(newButton, cartDrawerCheckout);
+        
+        newButton.addEventListener('click', (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+          this.newButtonAction(newButton);
+        });
+      }
+    }
+
+    hijackMainCartCheckout() {
+      const mainCartCheckout = document.querySelector('#checkout');
+      
+      if (mainCartCheckout) {
+        // Clone to remove existing listeners
+        const newButton = mainCartCheckout.cloneNode(true);
+        mainCartCheckout.parentNode.replaceChild(newButton, mainCartCheckout);
+        
+        newButton.addEventListener('click', (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+          this.newButtonAction(newButton);
+        });
+      }
+    }
+
+    hijackCartNotificationCheckout() {
+      const cartNotificationForm = document.querySelector('#cart-notification-form');
+      
+      if (cartNotificationForm) {
+        const checkoutButton = cartNotificationForm.querySelector('button[name="checkout"]');
+        
+        if (checkoutButton) {
+          // Clone to remove existing listeners
+          const newButton = checkoutButton.cloneNode(true);
+          checkoutButton.parentNode.replaceChild(newButton, checkoutButton);
+          
+          newButton.addEventListener('click', (evt) => {
+            evt.preventDefault();
+            evt.stopPropagation();
+            this.newButtonAction(newButton);
+          });
+        }
+        
+        // Also hijack form submit
+        const newForm = cartNotificationForm.cloneNode(true);
+        cartNotificationForm.parentNode.replaceChild(newForm, cartNotificationForm);
+        
+        newForm.addEventListener('submit', (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+          const button = newForm.querySelector('button[name="checkout"]');
+          this.newButtonAction(button);
+        });
+      }
+    }
+
+    // Function to add product to cart
+     addProductToCart(variantId, messageElement) {
+       const formData = {
+         'items': [{
+           'id': variantId,
+           'quantity': 1
+         }]
+       };
+
+       fetch('/cart/add.js', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         body: JSON.stringify(formData)
+       })
+       .then(response => response.json())
+       .then(data => {
+         console.log('Product added successfully:', data);
+         messageElement.textContent = 'Producto añadido exitosamente!';
+         messageElement.style.backgroundColor = '#d1ecf1';
+         messageElement.style.color = '#0c5460';
+         
+         // Dispatch cart update event to refresh cart UI
+         publish(PUB_SUB_EVENTS.cartUpdate, {
+           source: 'checkout-hijacker',
+           cartData: data,
+           variantId: variantId
+         });
+         
+         // Also directly call onCartUpdate for immediate refresh
+         const cartItems = document.querySelector('cart-items');
+         if (cartItems && typeof cartItems.onCartUpdate === 'function') {
+           cartItems.onCartUpdate();
+         }
+         
+         const cartDrawerItems = document.querySelector('cart-drawer-items');
+         if (cartDrawerItems && typeof cartDrawerItems.onCartUpdate === 'function') {
+           cartDrawerItems.onCartUpdate();
+         }
+       })
+       .catch((error) => {
+         console.error('Error:', error);
+         messageElement.textContent = 'Error al añadir producto';
+         messageElement.style.backgroundColor = '#f8d7da';
+         messageElement.style.color = '#721c24';
+       });
+     }
+
+    // Function that handles the new button action
+    newButtonAction(button) {
+      if (!button) return;
+      
+      // Check the hidden input for re attribute
+      const reInput = document.getElementById('cart-re-attribute');
+      const hasReAttribute = reInput && reInput.hasAttribute('data-re') && reInput.getAttribute('data-re') === 'true';
+      
+      // Disable the button
+      button.disabled = true;
+      button.setAttribute('disabled', 'disabled');
+      button.setAttribute('aria-disabled', 'true');
+      
+      // Add visual feedback
+      button.classList.add('disabled');
+      
+      // Optional: Change button text to indicate it's been hijacked
+      const buttonText = button.querySelector('span') || button;
+      const originalText = buttonText.textContent;
+      buttonText.textContent = 'Procesando...';
+      
+      // Log for debugging
+      console.log('Checkout button hijacked:', button);
+      
+      // Remove any existing message
+      const existingMessage = button.parentNode.querySelector('.checkout-hijacker-message');
+      if (existingMessage) {
+        existingMessage.remove();
+      }
+
+      // Create message element
+      const messageElement = document.createElement('div');
+      messageElement.className = 'checkout-hijacker-message';
+      messageElement.style.cssText = 'margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; font-size: 14px; text-align: center;';
+      
+      // Check if customer has 're' tag and show appropriate message
+      if (hasReAttribute) {
+        // Check if product is already in cart using the hidden input
+        const productCheckInput = document.getElementById('cart-product-check');
+        const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
+        
+        if (productInCart) {
+          messageElement.textContent = 'Es true - Producto ya está en el carrito';
+          messageElement.style.backgroundColor = '#fff3cd';
+          messageElement.style.color = '#856404';
+        } else {
+          messageElement.textContent = 'Es true - Añadiendo producto...';
+          messageElement.style.backgroundColor = '#d4edda';
+          messageElement.style.color = '#155724';
+          
+          // Add product with variant ID 56305163436419 using Ajax API
+          this.addProductToCart('56305163436419', messageElement);
+        }
+      } else {
+        messageElement.textContent = 'Botón de checkout secuestrado! Aquí puedes agregar tu lógica personalizada.';
+        messageElement.style.backgroundColor = '#fff3cd';
+        messageElement.style.color = '#856404';
+      }
+
+      // Insert message after the button
+      button.parentNode.insertBefore(messageElement, button.nextSibling);
+    }
+  }
+
+  // Initialize the hijacker
+  new CheckoutHijacker();
+</script>
+
+<style>
+  /* Optional: Style for disabled hijacked buttons */
+  button.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>
