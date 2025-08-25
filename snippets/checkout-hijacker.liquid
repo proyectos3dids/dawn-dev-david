@@ -173,6 +173,68 @@ NO
       return null;
     }
 
+    // Function to check and fix recargo equivalencia quantity in cart
+    checkAndFixRecargoQuantity(variantId, callback) {
+      // Get current cart
+      fetch('/cart.js')
+        .then(response => response.json())
+        .then(cart => {
+          // Find the recargo equivalencia product in cart
+          const recargoItem = cart.items.find(item => item.variant_id === variantId);
+          
+          if (recargoItem && recargoItem.quantity > 1) {
+            // Update quantity to 1
+            const updateData = {
+              'id': variantId,
+              'quantity': 1
+            };
+            
+            fetch('/cart/change.js', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(updateData)
+            })
+            .then(response => response.json())
+            .then(data => {
+              console.log('Recargo equivalencia quantity fixed to 1');
+              
+              // Dispatch cart update event
+              publish(PUB_SUB_EVENTS.cartUpdate, {
+                source: 'checkout-hijacker-quantity-fix',
+                cartData: data,
+                variantId: variantId
+              });
+              
+              // Update cart UI
+              const cartItems = document.querySelector('cart-items');
+              if (cartItems && typeof cartItems.onCartUpdate === 'function') {
+                cartItems.onCartUpdate();
+              }
+              
+              const cartDrawerItems = document.querySelector('cart-drawer-items');
+              if (cartDrawerItems && typeof cartDrawerItems.onCartUpdate === 'function') {
+                cartDrawerItems.onCartUpdate();
+              }
+              
+              if (callback) callback();
+            })
+            .catch(error => {
+              console.error('Error fixing recargo equivalencia quantity:', error);
+              if (callback) callback();
+            });
+          } else {
+            // Quantity is already 1 or product not in cart, continue
+            if (callback) callback();
+          }
+        })
+        .catch(error => {
+          console.error('Error checking cart:', error);
+          if (callback) callback();
+        });
+    }
+
     // Function to add product to cart
      addProductToCart(variantId, messageElement, onSuccess, onError) {
        const formData = {
@@ -277,15 +339,23 @@ NO
         const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
         
         if (productInCart) {
-          // Proceed to checkout since product is already in cart
-          proceedToCheckout();
+          // Check and fix quantity before proceeding to checkout
+          const variantId = this.getRecargoEquivalenciaVariant();
+          if (variantId) {
+            this.checkAndFixRecargoQuantity(variantId, proceedToCheckout);
+          } else {
+            proceedToCheckout();
+          }
         } else {
           // Get product from theme settings
           const variantId = this.getRecargoEquivalenciaVariant();
           if (variantId) {
             // Create a dummy message element for the addProductToCart function
             const dummyMessageElement = document.createElement('div');
-            this.addProductToCart(variantId, dummyMessageElement, proceedToCheckout, () => {
+            this.addProductToCart(variantId, dummyMessageElement, () => {
+              // After adding product, check and fix quantity before proceeding
+              this.checkAndFixRecargoQuantity(variantId, proceedToCheckout);
+            }, () => {
               // On error, just proceed to checkout anyway
               proceedToCheckout();
             });
