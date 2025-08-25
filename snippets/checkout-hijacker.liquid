@@ -175,19 +175,36 @@ NO
 
     // Function to check and fix recargo equivalencia quantity in cart
     checkAndFixRecargoQuantity(variantId, callback) {
+      console.log('Checking recargo equivalencia quantity for variant ID:', variantId);
+      
       // Get current cart
       fetch('/cart.js')
         .then(response => response.json())
         .then(cart => {
+          console.log('Current cart items:', cart.items);
+          
           // Find the recargo equivalencia product in cart
-          const recargoItem = cart.items.find(item => item.variant_id === variantId);
+          const recargoItem = cart.items.find(item => {
+            console.log('Checking item variant_id:', item.variant_id, 'against target:', variantId);
+            return item.variant_id == variantId; // Use == instead of === to handle string/number comparison
+          });
+          
+          console.log('Found recargo item:', recargoItem);
           
           if (recargoItem && recargoItem.quantity > 1) {
-            // Update quantity to 1
+            console.log('Recargo quantity is', recargoItem.quantity, '- fixing to 1');
+            
+            // Find the line index of the recargo item (1-based index)
+            const lineIndex = cart.items.findIndex(item => item.variant_id == variantId) + 1;
+            console.log('Found recargo item at line index:', lineIndex);
+            
+            // Update quantity to 1 using line-based format
             const updateData = {
-              'id': variantId,
+              'line': lineIndex,
               'quantity': 1
             };
+            
+            console.log('Sending update request:', updateData);
             
             fetch('/cart/change.js', {
               method: 'POST',
@@ -196,9 +213,12 @@ NO
               },
               body: JSON.stringify(updateData)
             })
-            .then(response => response.json())
+            .then(response => {
+              console.log('Update response status:', response.status);
+              return response.json();
+            })
             .then(data => {
-              console.log('Recargo equivalencia quantity fixed to 1');
+              console.log('Recargo equivalencia quantity fixed to 1. Response:', data);
               
               // Dispatch cart update event
               publish(PUB_SUB_EVENTS.cartUpdate, {
@@ -225,7 +245,7 @@ NO
               if (callback) callback();
             });
           } else {
-            // Quantity is already 1 or product not in cart, continue
+            console.log('Quantity is already 1 or product not in cart, continuing');
             if (callback) callback();
           }
         })
@@ -341,9 +361,11 @@ NO
         if (productInCart) {
           // Check and fix quantity before proceeding to checkout
           const variantId = this.getRecargoEquivalenciaVariant();
+          console.log('Product is in cart, checking quantity for variant:', variantId);
           if (variantId) {
             this.checkAndFixRecargoQuantity(variantId, proceedToCheckout);
           } else {
+            console.log('No variant ID found, proceeding to checkout');
             proceedToCheckout();
           }
         } else {
@@ -372,7 +394,23 @@ NO
   }
 
   // Initialize the hijacker
-  new CheckoutHijacker();
+  const hijacker = new CheckoutHijacker();
+  
+  // Also check and fix quantity on page load if product is already in cart
+  document.addEventListener('DOMContentLoaded', function() {
+    const productCheckInput = document.getElementById('cart-product-check');
+    const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
+    
+    if (productInCart) {
+      const variantId = hijacker.getRecargoEquivalenciaVariant();
+      if (variantId) {
+        console.log('Page loaded with recargo product in cart, checking quantity');
+        hijacker.checkAndFixRecargoQuantity(variantId, () => {
+          console.log('Quantity check completed on page load');
+        });
+      }
+    }
+  });
 </script>
 
 <style>
