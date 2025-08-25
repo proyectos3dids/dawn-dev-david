@@ -59,6 +59,42 @@
   {%- endif -%}
 {% endif %}
 
+{% comment %} Auto-add recargo product if cliente_RE is true and product is not in cart {% endcomment %}
+{%- if cart.attributes.cliente_RE == "true" -%}
+  {% comment %} Check if recargo product is already in cart {% endcomment %}
+  {% assign recargo_in_cart = false %}
+  {% for item in cart.items %}
+    {% if item.variant_id == recargo_variant_id %}
+      {% assign recargo_in_cart = true %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} If recargo product is not in cart, add it automatically {% endcomment %}
+  {%- unless recargo_in_cart -%}
+    <script>
+      console.log('Cliente RE detected, adding recargo product automatically');
+      fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: {{ recargo_variant_id }},
+          quantity: 1
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Recargo product added successfully:', data);
+        // Reload the page to reflect the cart changes
+        window.location.reload();
+      })
+      .catch(error => {
+        console.error('Error adding recargo product:', error);
+      });
+    </script>
+  {%- endunless -%}
+{%- endif -%}
+
 
 
 {% comment %} Hidden field for cart attribute {% endcomment %}
