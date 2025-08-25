@@ -14,21 +14,46 @@
 
 {% comment %} Check if customer is logged in and has "re" tag {% endcomment %}
 {% assign recargo = false %}
-NO
-{{ customer.name }}
+
 {% if customer %}
-  SI
   {% for tag in customer.tags %}
     {% assign tag_lowercase = tag | downcase %}
-    {{ tag_lowercase }}
     {% if tag_lowercase == 're' %}
       {% assign recargo = true %}
+      {%- if cart.attributes.cliente_RE != "true" -%}
+        <script>
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              attributes: {
+                cliente_RE: 'true'
+              }
+            })
+          });
+        </script>
+      {%- endif -%}
       {% break %}
     {% endif %}
   {% endfor %}
+{% else %}
+  {% comment %} If no customer is logged in, remove cliente_RE attribute {% endcomment %}
+  {%- if cart.attributes.cliente_RE -%}
+    <script>
+      fetch('/cart/update.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attributes: {
+            cliente_RE: null
+          }
+        })
+      });
+    </script>
+  {%- endif -%}
 {% endif %}
 
-{{ recargo }}
+
 
 {% comment %} Hidden field for cart attribute {% endcomment %}
 <input type="hidden" id="cart-re-attribute" {% if recargo %}data-re="true"{% endif %} style="display: none;">
