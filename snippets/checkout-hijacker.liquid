@@ -42,9 +42,13 @@
     {% endif %}
   {% endfor %}
 {% else %}
-  {% comment %} If no customer is logged in, remove cliente_RE and recargo_variant_id attributes {% endcomment %}
+  {% comment %} If no customer is logged in, remove cliente_RE and recargo_variant_id attributes and remove recargo product from cart {% endcomment %}
   {%- if cart.attributes.cliente_RE or cart.attributes.recargo_variant_id -%}
     <script>
+      console.log('=== NO CUSTOMER LOGGED IN - CLEANING CART ===');
+      console.log('Removing cliente_RE attributes and recargo product from cart');
+      
+      // First, remove the attributes
       fetch('/cart/update.js', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,6 +58,31 @@
             recargo_variant_id: null
           }
         })
+      }).then(() => {
+        console.log('✓ Cart attributes removed');
+        
+        // Then, check if recargo product is in cart and remove it
+        {% assign recargo_variant_id = all_products[settings.recargo_equivalencia_product].selected_or_first_available_variant.id %}
+        {% for item in cart.items %}
+          {% if item.variant_id == recargo_variant_id %}
+            console.log('Found recargo product in cart, removing it');
+            fetch('/cart/change.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: {{ item.variant_id }},
+                quantity: 0
+              })
+            }).then(() => {
+              console.log('✓ Recargo product removed from cart');
+            }).catch(error => {
+              console.error('✗ Error removing recargo product:', error);
+            });
+            {% break %}
+          {% endif %}
+        {% endfor %}
+      }).catch(error => {
+        console.error('✗ Error removing cart attributes:', error);
       });
     </script>
   {%- endif -%}
