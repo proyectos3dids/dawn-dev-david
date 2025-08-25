@@ -113,10 +113,9 @@
       })
       .then(data => {
         console.log('✓ Recargo product added successfully:', data);
-        // Reload the page to reflect the cart changes
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
+        console.log('✓ Product added without page refresh');
+        // Optionally trigger a cart update event or update cart UI here
+        // window.dispatchEvent(new Event('cart:updated'));
       })
       .catch(error => {
         console.error('✗ Error adding recargo product:', error);
