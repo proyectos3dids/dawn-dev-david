@@ -15,19 +15,24 @@
 {% comment %} Check if customer is logged in and has "re" tag {% endcomment %}
 {% assign recargo = false %}
 
+{% comment %} Get the recargo product variant ID from theme settings {% endcomment %}
+{% assign recargo_product = all_products[settings.recargo_equivalencia_product] %}
+{% assign recargo_variant_id = recargo_product.selected_or_first_available_variant.id %}
+
 {% if customer %}
   {% for tag in customer.tags %}
     {% assign tag_lowercase = tag | downcase %}
     {% if tag_lowercase == 're' %}
       {% assign recargo = true %}
-      {%- if cart.attributes.cliente_RE != "true" -%}
+      {%- if cart.attributes.cliente_RE != "true" or cart.attributes.recargo_variant_id != recargo_variant_id -%}
         <script>
           fetch('/cart/update.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               attributes: {
-                cliente_RE: 'true'
+                cliente_RE: 'true',
+                recargo_variant_id: '{{ recargo_variant_id }}'
               }
             })
           });
@@ -37,15 +42,16 @@
     {% endif %}
   {% endfor %}
 {% else %}
-  {% comment %} If no customer is logged in, remove cliente_RE attribute {% endcomment %}
-  {%- if cart.attributes.cliente_RE -%}
+  {% comment %} If no customer is logged in, remove cliente_RE and recargo_variant_id attributes {% endcomment %}
+  {%- if cart.attributes.cliente_RE or cart.attributes.recargo_variant_id -%}
     <script>
       fetch('/cart/update.js', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attributes: {
-            cliente_RE: null
+            cliente_RE: null,
+            recargo_variant_id: null
           }
         })
       });
