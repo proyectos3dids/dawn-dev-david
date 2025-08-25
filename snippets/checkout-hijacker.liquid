@@ -397,20 +397,7 @@ NO
   const hijacker = new CheckoutHijacker();
   
   // Also check and fix quantity on page load if product is already in cart
-  document.addEventListener('DOMContentLoaded', function() {
-    const productCheckInput = document.getElementById('cart-product-check');
-    const productInCart = productCheckInput && productCheckInput.getAttribute('data-product-in-cart') === 'true';
-    
-    if (productInCart) {
-      const variantId = hijacker.getRecargoEquivalenciaVariant();
-      if (variantId) {
-        console.log('Page loaded with recargo product in cart, checking quantity');
-        hijacker.checkAndFixRecargoQuantity(variantId, () => {
-          console.log('Quantity check completed on page load');
-        });
-      }
-    }
-  });
+  // Quantity check is now only performed when checkout button is clicked
 </script>
 
 <style>
